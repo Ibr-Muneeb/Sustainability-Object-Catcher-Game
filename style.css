@@ -36,6 +36,7 @@ h1 {
     border: 4px solid #F4A5D6;
     background-color: #F9E7F3;
     position: relative;
+    overflow: hidden;
 }
 
 #catcher {
@@ -44,13 +45,12 @@ h1 {
     position: absolute;
     bottom: 30px;
     left: 5px;
-    background-color: #ff0000;
     visibility: hidden;
 }
 
 .falling-object {
-    width: 40px;
-    height: 40px;
+    width: 35px;
+    height: 35px;
     position: absolute;
     border-radius: 5px;
 }
