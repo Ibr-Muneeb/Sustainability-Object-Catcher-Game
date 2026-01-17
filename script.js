@@ -161,8 +161,12 @@ function createFallingObjects() {
     obj.style.height = "35px";
     obj.style.position = "absolute";
 
-    obj.style.left = Math.random() * (pane.clientWidth - 40) + "px";
-    obj.style.top = -(i * spacing + 40) + "px";
+    const y = -(i * spacing + 40);
+    const lane = pickSafeLane(y, obj);
+    obj.dataset.lane = lane;
+    obj.style.left = laneLeftPx(lane, 40) + "px";
+    obj.style.top = y + "px";
+
 
     pane.appendChild(obj);
     fallingObjects.push(obj);
@@ -215,8 +219,13 @@ function resetObject(obj) {
   obj.className = "falling-object " + item.type;
   obj.dataset.type = item.type;
 
-  obj.style.top = -(Math.random() * spacing + 40) + "px";
-  obj.style.left = Math.random() * (pane.clientWidth - 40) + "px";
+  const y = -(Math.random() * spacing + 40);
+    const lane = pickSafeLane(y, obj);
+    obj.dataset.lane = lane;
+
+    obj.style.top = y + "px";
+    obj.style.left = laneLeftPx(lane, 40) + "px";
+
 }
 
 function endGame(reasonText = "Game Over!") {
@@ -239,3 +248,53 @@ function endGame(reasonText = "Game Over!") {
   alert(`${reasonText}\nFinal score: ${score}`);
 }
 
+const LANES = 8;                // more lanes = more variety, fewer overlaps
+const SAFE_GAP_Y = 80;          // min vertical separation in same lane (px)
+const MAX_TRIES = 25;
+
+function laneLeftPx(laneIndex, objWidth) {
+  const pane = document.getElementById("pane");
+  const laneW = pane.clientWidth / LANES;
+  // center the object in the lane
+  const center = laneW * (laneIndex + 0.5);
+  return Math.max(0, Math.min(pane.clientWidth - objWidth, center - objWidth / 2));
+}
+
+function laneIsSafe(laneIndex, y, objEl) {
+  // Prevent overlap with other objects in same lane when they are vertically close
+  for (const other of fallingObjects) {
+    if (other === objEl) continue;
+
+    const otherLane = Number(other.dataset.lane);
+    if (otherLane !== laneIndex) continue;
+
+    const dy = Math.abs(other.offsetTop - y);
+    if (dy < SAFE_GAP_Y) return false;
+  }
+  return true;
+}
+
+function pickSafeLane(y, objEl) {
+  // Try a few random lanes, then fall back to the best available
+  let bestLane = 0;
+  let bestScore = -Infinity;
+
+  for (let t = 0; t < MAX_TRIES; t++) {
+    const lane = Math.floor(Math.random() * LANES);
+    if (laneIsSafe(lane, y, objEl)) return lane;
+
+    // score how "good" this lane is (farthest vertical distance from nearest object in same lane)
+    let nearest = Infinity;
+    for (const other of fallingObjects) {
+      if (other === objEl) continue;
+      if (Number(other.dataset.lane) !== lane) continue;
+      nearest = Math.min(nearest, Math.abs(other.offsetTop - y));
+    }
+    if (nearest > bestScore) {
+      bestScore = nearest;
+      bestLane = lane;
+    }
+  }
+
+  return bestLane;
+}
