@@ -45,4 +45,24 @@ h1 {
     bottom: 30px;
     left: 5px;
     background-color: #ff0000;
+    visibility: hidden;
+}
+
+.falling-object {
+    width: 40px;
+    height: 40px;
+    position: absolute;
+    border-radius: 5px;
+}
+
+.trash {
+    background-color: gray;
+}
+
+.recycle {
+    background-color: blue;
+}
+
+.compost {
+    background-color: green;
 }
