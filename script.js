@@ -1,300 +1,272 @@
-let fallingObjects = [];
-let gameInterval = null;
-let gameRunning = false;
-
-let score = 0;
-let hiScore = 0;
-let strikes = 0;
-const MAX_STRIKES = 3;
+const MAX_STRIKES  = 3;
+const BASE_SPEED   = 2;
+const SPEED_STEP   = 1;   
+const MAX_SPEED    = 6;
+const CATCHER_W    = 90;
+const MOVE_STEP    = 13;
 
 
-let currentMode = "trash";
+const ITEMS = [
+  { name: "chip-bag",       type: "trash",   img: "images/chip-bag.png" },
+  { name: "coffee-cup",     type: "trash",   img: "images/coffee-cup.png" },
+  { name: "pizza-box",      type: "trash",   img: "images/pizza-box.png" },
+  { name: "plastic-bottle", type: "recycle", img: "images/plastic-bottle.png" },
+  { name: "cardboard",      type: "recycle", img: "images/cardboard.png" },
+  { name: "paper",          type: "recycle", img: "images/paper.png" },
+  { name: "banana-peel",    type: "compost", img: "images/banana-peel.png" },
+  { name: "apple-core",     type: "compost", img: "images/apple-core.png" },
+  { name: "leaves",         type: "compost", img: "images/leaves.png" },
+];
 
-document.addEventListener("DOMContentLoaded", function () {
-  hiScore = Number(localStorage.getItem("hiScore") || 0);
-  if (!Number.isFinite(hiScore)) hiScore = 0;
-  updateScoreUI();
+let gameRunning    = false;
+let gameLoop       = null;
+let moveLoop       = null;
+let currentMode    = "trash";
+let score          = 0;
+let hiScore        = Number(localStorage.getItem("hiScore") || 0);
+let strikes        = 0;
+let catchCount     = 0;
+let fallingSpeed   = BASE_SPEED;
+let catcherLeft    = 200;
+let activeObj      = null;
+const keys         = {};
 
-  const pane = document.getElementById("pane");
-  const box = document.getElementById("catcher");
+document.addEventListener("DOMContentLoaded", () => {
+  updateHUD();
 
-  setCatcherMode(currentMode);
+  const pane   = document.getElementById("pane");
+  const catcher = document.getElementById("catcher");
 
-  const w = pane.clientWidth - box.clientWidth;
-  const d = {};
-  const x = 10;
+  catcherLeft = pane.clientWidth / 2 - CATCHER_W / 2;
+  catcher.style.left = catcherLeft + "px";
 
-  function newv(v, a, b) {
-    let n = v - (d[a] ? x : 0) + (d[b] ? x : 0);
-    if (n < 0) return 0;
-    if (n > w) return w;
-    return n;
-  }
-
-  window.addEventListener("keydown", function (e) {
-    if (e.key === "1") {
-      setCatcherMode("trash");
-      return;
-    }
-    if (e.key === "2") {
-      setCatcherMode("recycle");
-      return;
-    }
-    if (e.key === "3") {
-      setCatcherMode("compost");
-      return;
-    }
-
-    d[e.keyCode] = true;
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "1") { setCatcherMode("trash");   return; }
+    if (e.key === "2") { setCatcherMode("recycle"); return; }
+    if (e.key === "3") { setCatcherMode("compost"); return; }
+    keys[e.code] = true;
   });
 
-  window.addEventListener("keyup", function (e) {
-    d[e.keyCode] = false;
+  window.addEventListener("keyup", (e) => {
+    keys[e.code] = false;
   });
-
-  setInterval(function () {
-    const currentLeft = box.offsetLeft;
-    box.style.left = newv(currentLeft, 37, 39) + "px";
-  }, 20);
 });
 
-const items = [
-  { name: "chip-bag", type: "trash" },
-  { name: "plastic-wrapper", type: "trash" },
-  { name: "styrofoam", type: "trash" },
-
-  { name: "plastic-bottle", type: "recycle" },
-  { name: "can", type: "recycle" },
-  { name: "paper", type: "recycle" },
-
-  { name: "banana-peel", type: "compost" },
-  { name: "apple-core", type: "compost" },
-  { name: "leaves", type: "compost" }
-];
 
 function setCatcherMode(mode) {
   currentMode = mode;
-  const catcher = document.getElementById("catcher");
-  if (!catcher) return;
 
+  const catcher = document.getElementById("catcher");
   catcher.classList.remove("trash", "recycle", "compost");
   catcher.classList.add(mode);
-}
 
-function updateScoreUI() {
-  const scoreEl = document.getElementById("score");
-  const hiEl = document.getElementById("hi-score");
-
-  if (scoreEl) scoreEl.textContent = `score: ${score}  |  strikes: ${strikes}/${MAX_STRIKES}`;
-  if (hiEl) hiEl.textContent = `hi-score: ${hiScore}`;
+  document.querySelectorAll(".mode-btn").forEach(btn => btn.classList.remove("active"));
+  document.getElementById("btn-" + mode).classList.add("active");
 }
 
 
-function isColliding(a, b) {
-  const aLeft = a.offsetLeft;
-  const aTop = a.offsetTop;
-  const aRight = aLeft + a.offsetWidth;
-  const aBottom = aTop + a.offsetHeight;
-
-  const bLeft = b.offsetLeft;
-  const bTop = b.offsetTop;
-  const bRight = bLeft + b.offsetWidth;
-  const bBottom = bTop + b.offsetHeight;
-
-  return aLeft < bRight && aRight > bLeft && aTop < bBottom && aBottom > bTop;
-}
-
-function handleCatch(obj) {
-  const objType = obj.dataset.type;
-
-  if (objType === currentMode) {
-    score += 1;
-  } else {
-    strikes += 1;
-    if (strikes >= MAX_STRIKES) {
-      updateScoreUI();
-      endGame("Too many wrong bins!");
-      return;
-    }
-  }
-
-  if (score > hiScore) {
-    hiScore = score;
-    localStorage.setItem("hiScore", String(hiScore));
-  }
-
-  updateScoreUI();
-  resetObject(obj);
+function updateHUD() {
+  document.getElementById("score-display").textContent = "Score: " + score;
+  document.getElementById("hi-display").textContent    = "Best: "  + hiScore;
 }
 
 
 function startGame() {
   if (gameRunning) return;
-  gameRunning = true;
+  gameRunning  = true;
+  score        = 0;
+  strikes      = 0;
+  catchCount   = 0;
+  fallingSpeed = BASE_SPEED;
 
-  score = 0;
-  strikes = 0;
-  updateScoreUI();
+  updateHUD();
 
-  const startButton = document.getElementById("start");
+  document.getElementById("start-screen").style.display    = "none";
+  document.getElementById("gameover-screen").classList.remove("show");
+
   const catcher = document.getElementById("catcher");
-
-  startButton.style.display = "none";
   catcher.style.visibility = "visible";
+  setCatcherMode("trash");   
 
-  createFallingObjects();
-  startGameLoop();
+  spawnObject();
+  startLoops();
 }
 
-function createFallingObjects() {
+function endGame() {
+  gameRunning = false;
+  clearInterval(gameLoop);
+  clearInterval(moveLoop);
+  gameLoop  = null;
+  moveLoop  = null;
+
+  if (activeObj) { activeObj.remove(); activeObj = null; }
+
+  document.getElementById("catcher").style.visibility = "hidden";
+
+  const goScreen = document.getElementById("gameover-screen");
+  goScreen.classList.add("show");
+
+  document.getElementById("go-message").textContent = " Game Over!";
+  document.getElementById("go-score").textContent   =
+    "You scored " + score + (score > 0 && score === hiScore ? " — new best!" : "");
+}
+
+
+function startLoops() {
+  moveLoop = setInterval(() => {
+    if (!gameRunning) return;
+    const pane    = document.getElementById("pane");
+    const maxLeft = pane.clientWidth - CATCHER_W;
+
+    if (keys["ArrowLeft"]  || keys["KeyA"]) catcherLeft = Math.max(0,       catcherLeft - MOVE_STEP);
+    if (keys["ArrowRight"] || keys["KeyD"]) catcherLeft = Math.min(maxLeft, catcherLeft + MOVE_STEP);
+
+    document.getElementById("catcher").style.left = catcherLeft + "px";
+  }, 16);
+
+  gameLoop = setInterval(() => {
+    if (!gameRunning || !activeObj) return;
+
+    const pane    = document.getElementById("pane");
+    const catcher = document.getElementById("catcher");
+
+    let y = activeObj.offsetTop + fallingSpeed;
+    activeObj.style.top = y + "px";
+
+    if (isColliding(activeObj, catcher)) {
+      resolveCollision(true);
+      return;
+    }
+
+    if (y > pane.clientHeight) {
+      resolveCollision(false);
+    }
+  }, 16);
+}
+
+function spawnObject() {
+  if (activeObj) { activeObj.remove(); activeObj = null; }
+
   const pane = document.getElementById("pane");
-  const spacing = 250;
+  const item = ITEMS[Math.floor(Math.random() * ITEMS.length)];
 
-  for (let i = 0; i < 3; i++) {
-    const obj = document.createElement("div");
-    const item = items[Math.floor(Math.random() * items.length)];
-
-    obj.classList.add("falling-object", item.type);
-    obj.dataset.type = item.type;
-
-    obj.style.width = "35px";
-    obj.style.height = "35px";
-    obj.style.position = "absolute";
-
-    const y = -(i * spacing + 40);
-    const lane = pickSafeLane(y, obj);
-    obj.dataset.lane = lane;
-    obj.style.left = laneLeftPx(lane, 40) + "px";
-    obj.style.top = y + "px";
-
-
-    pane.appendChild(obj);
-    fallingObjects.push(obj);
-  }
-}
-
-function startGameLoop() {
-  const catcher = document.getElementById("catcher");
-
-  if (gameInterval) clearInterval(gameInterval);
-
-  gameInterval = setInterval(() => {
-    fallingObjects.forEach(obj => {
-      moveFallingObject(obj);
-
-      if (isColliding(obj, catcher)) {
-        handleCatch(obj);
-      }
-    });
-  }, 20);
-}
-
-function moveFallingObject(obj) {
-  const pane = document.getElementById("pane");
-
-  let y = obj.offsetTop;
-  y += 2;
-  obj.style.top = y + "px";
-
-  if (y > pane.clientHeight) {
-  strikes += 1;
-
-  if (strikes >= MAX_STRIKES) {
-    updateScoreUI();
-    endGame("You missed too many objects!");
-    return;
-  }
-
-  updateScoreUI();
-  resetObject(obj);
-}
-}
-
-function resetObject(obj) {
-  const pane = document.getElementById("pane");
-  const spacing = 500;
-
-  const item = items[Math.floor(Math.random() * items.length)];
-
-  obj.className = "falling-object " + item.type;
+  const obj = document.createElement("div");
+  obj.className = "falling-object";
+  obj.style.backgroundImage = `url('${item.img}')`;
   obj.dataset.type = item.type;
 
-  const y = -(Math.random() * spacing + 40);
-    const lane = pickSafeLane(y, obj);
-    obj.dataset.lane = lane;
+  const maxX = pane.clientWidth - 52;
+  obj.style.left = Math.floor(Math.random() * maxX) + "px";
+  obj.style.top  = "-60px";
 
-    obj.style.top = y + "px";
-    obj.style.left = laneLeftPx(lane, 40) + "px";
-
+  pane.appendChild(obj);
+  activeObj = obj;
+}
+function isColliding(a, b) {
+  const ra = a.getBoundingClientRect();
+  const rb = b.getBoundingClientRect();
+  return ra.left < rb.right && ra.right > rb.left &&
+         ra.top  < rb.bottom && ra.bottom > rb.top;
 }
 
-function endGame(reasonText = "Game Over!") {
-  gameRunning = false;
+function resolveCollision(caught) {
+  const correct = caught && activeObj.dataset.type === currentMode;
+  const missed  = !caught;
 
-  if (gameInterval) {
-    clearInterval(gameInterval);
-    gameInterval = null;
+  if (!correct) {
+    strikes++;
+    triggerMiss();
+
+    if (strikes >= MAX_STRIKES) {
+      if (activeObj) { activeObj.remove(); activeObj = null; }
+      updateHUD();
+      setTimeout(endGame, 400);
+      return;
+    }
   }
 
-  fallingObjects.forEach(o => o.remove());
-  fallingObjects = [];
+  if (correct) {
+    score++;
+    catchCount++;
 
-  const startButton = document.getElementById("start");
-  if (startButton) {
-    startButton.style.display = "block";
-    startButton.textContent = "Restart Game";
+    if (catchCount % 5 === 0) {
+      fallingSpeed = Math.min(fallingSpeed + SPEED_STEP, MAX_SPEED);
+    }
+
+    if (score > hiScore) {
+      hiScore = score;
+      localStorage.setItem("hiScore", String(hiScore));
+    }
+
+    spawnParticles();
+    showScorePop();
   }
 
-  alert(`${reasonText}\nFinal score: ${score}`);
+  updateHUD();
+
+  if (activeObj) { activeObj.remove(); activeObj = null; }
+
+  setTimeout(() => {
+    if (gameRunning) spawnObject();
+  }, 300);
 }
 
-const LANES = 8;                // more lanes = more variety, fewer overlaps
-const SAFE_GAP_Y = 80;          // min vertical separation in same lane (px)
-const MAX_TRIES = 25;
 
-function laneLeftPx(laneIndex, objWidth) {
+function triggerMiss() {
   const pane = document.getElementById("pane");
-  const laneW = pane.clientWidth / LANES;
-  // center the object in the lane
-  const center = laneW * (laneIndex + 0.5);
-  return Math.max(0, Math.min(pane.clientWidth - objWidth, center - objWidth / 2));
+
+  pane.classList.remove("shake", "miss-flash");
+  void pane.offsetWidth; 
+  pane.classList.add("shake", "miss-flash");
+
+  setTimeout(() => pane.classList.remove("shake", "miss-flash"), 450);
 }
 
-function laneIsSafe(laneIndex, y, objEl) {
-  // Prevent overlap with other objects in same lane when they are vertically close
-  for (const other of fallingObjects) {
-    if (other === objEl) continue;
+function spawnParticles() {
+  if (!activeObj) return;
+  const pane  = document.getElementById("pane");
+  const pRect = pane.getBoundingClientRect();
+  const oRect = activeObj.getBoundingClientRect();
+  const cx    = oRect.left - pRect.left + oRect.width  / 2;
+  const cy    = oRect.top  - pRect.top  + oRect.height / 2;
 
-    const otherLane = Number(other.dataset.lane);
-    if (otherLane !== laneIndex) continue;
+  const colors = ["#ffb3d1", "#b3d9ff", "#b3ffcc", "#fff4b3", "#e0b3ff"];
 
-    const dy = Math.abs(other.offsetTop - y);
-    if (dy < SAFE_GAP_Y) return false;
+  for (let i = 0; i < 7; i++) {
+    const p     = document.createElement("div");
+    p.className = "particle";
+    const size  = 6 + Math.random() * 7;
+    p.style.width  = size + "px";
+    p.style.height = size + "px";
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.left = cx + "px";
+    p.style.top  = cy + "px";
+
+    const angle = (i / 7) * Math.PI * 2;
+    const dist  = 25 + Math.random() * 35;
+    p.style.setProperty("--dx", Math.cos(angle) * dist + "px");
+    p.style.setProperty("--dy", Math.sin(angle) * dist + "px");
+    p.style.animationDuration = "0.5s";
+
+    pane.appendChild(p);
+    setTimeout(() => p.remove(), 550);
   }
-  return true;
 }
 
-function pickSafeLane(y, objEl) {
-  // Try a few random lanes, then fall back to the best available
-  let bestLane = 0;
-  let bestScore = -Infinity;
 
-  for (let t = 0; t < MAX_TRIES; t++) {
-    const lane = Math.floor(Math.random() * LANES);
-    if (laneIsSafe(lane, y, objEl)) return lane;
+function showScorePop() {
+  if (!activeObj) return;
+  const pane  = document.getElementById("pane");
+  const pRect = pane.getBoundingClientRect();
+  const oRect = activeObj.getBoundingClientRect();
 
-    // score how "good" this lane is (farthest vertical distance from nearest object in same lane)
-    let nearest = Infinity;
-    for (const other of fallingObjects) {
-      if (other === objEl) continue;
-      if (Number(other.dataset.lane) !== lane) continue;
-      nearest = Math.min(nearest, Math.abs(other.offsetTop - y));
-    }
-    if (nearest > bestScore) {
-      bestScore = nearest;
-      bestLane = lane;
-    }
-  }
+  const pop     = document.createElement("div");
+  pop.className = "score-pop";
+  pop.textContent = "+1";
+  pop.style.color = "#c060a0";
+  pop.style.left  = (oRect.left - pRect.left + 10) + "px";
+  pop.style.top   = (oRect.top  - pRect.top)       + "px";
 
-  return bestLane;
+  pane.appendChild(pop);
+  setTimeout(() => pop.remove(), 750);
 }

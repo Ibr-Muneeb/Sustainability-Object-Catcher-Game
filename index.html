@@ -2,27 +2,53 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
-
-  <link rel="stylesheet" href="style.css" />
-
-  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="script.js"></script>
-
-  </script>
-
-
-  <title>Object Catcher | Sustainability Game</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sort It! | Sustainability Game</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>Catch The Falling Objects</h1>
-    <div class="info">
-      <div id="hi-score">hi-score: 0</div>
-      <div id="score">score: 0</div>
+
+
+  <div id="hud">
+    <span id="score-display">Score: 0</span>
+    <span id="hi-display">Best: 0</span>
+  </div>
+
+  <div id="mode-bar">
+    <button class="mode-btn active" id="btn-trash" onclick="setCatcherMode('trash')">
+      <div class="bin-img trash-img"></div>
+      <span class="key-hint">1</span>
+    </button>
+    <button class="mode-btn" id="btn-recycle" onclick="setCatcherMode('recycle')">
+      <div class="bin-img recycle-img"></div>
+      <span class="key-hint">2</span>
+    </button>
+    <button class="mode-btn" id="btn-compost" onclick="setCatcherMode('compost')">
+      <div class="bin-img compost-img"></div>
+      <span class="key-hint">3</span>
+    </button>
+  </div>
+
+  <div id="pane">
+
+    <div id="start-screen">
+      <p class="hint-text">Press <strong>1 / 2 / 3</strong> to switch bins</p>
+      <p class="hint-text">Use <strong>← →</strong> arrow keys to move</p>
+      <button id="start-btn" onclick="startGame()">Start Game</button>
     </div>
-    <div id="pane">
-      <button id="start" onclick="startGame()">Start Game</button>
-      <div id="catcher"></div>
+
+    <div id="gameover-screen">
+      <p id="go-message">!</p>
+      <p id="go-score"></p>
+      <button id="restart-btn" onclick="startGame()">Play Again</button>
     </div>
+
+    <div id="catcher"></div>
+
+  </div>
+
+  <p id="sub-text">Move your bin to catch items in the right category!</p>
+
+  <script src="script.js"></script>
 </body>
 </html>
